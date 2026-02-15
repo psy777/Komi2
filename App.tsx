@@ -346,8 +346,8 @@ const App: React.FC = () => {
       {/* Main Layout */}
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-950 relative">
         
-        {/* Left Panel: Board (Maintained Square, Comfortably Centered) */}
-        <div className="flex-1 min-w-0 min-h-0 relative flex items-center justify-center overflow-hidden p-4 md:p-8">
+        {/* Left Panel: Board (Seamless wood surface integration) */}
+        <div className="flex-1 min-w-0 min-h-0 relative flex items-center justify-center overflow-hidden p-0">
              <GoBoard 
                 grid={boardState.grid} 
                 lastMove={boardState.lastMove}

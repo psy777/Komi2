@@ -17,7 +17,8 @@ const STAR_POINTS = [
 
 const GoBoard: React.FC<GoBoardProps> = ({ grid, lastMove, onIntersectionClick, markers }) => {
   const cellSize = 30;
-  const padding = 22; // Reduced padding for a tighter wooden border to maximize board size
+  // Reduced padding significantly to remove the "tan padding" feel while still allowing coordinates
+  const padding = 18; 
   const boardPixelSize = (BOARD_SIZE - 1) * cellSize + padding * 2;
 
   // Render Grid Lines
@@ -33,7 +34,8 @@ const GoBoard: React.FC<GoBoardProps> = ({ grid, lastMove, onIntersectionClick, 
           x2={padding + i * cellSize}
           y2={boardPixelSize - padding}
           stroke="#000"
-          strokeWidth="1"
+          strokeWidth="1.2"
+          strokeOpacity="0.8"
         />
       );
       // Horizontal
@@ -45,7 +47,8 @@ const GoBoard: React.FC<GoBoardProps> = ({ grid, lastMove, onIntersectionClick, 
           x2={boardPixelSize - padding}
           y2={padding + i * cellSize}
           stroke="#000"
-          strokeWidth="1"
+          strokeWidth="1.2"
+          strokeOpacity="0.8"
         />
       );
     }
@@ -58,8 +61,9 @@ const GoBoard: React.FC<GoBoardProps> = ({ grid, lastMove, onIntersectionClick, 
       key={`star-${i}`}
       cx={padding + p.x * cellSize}
       cy={padding + p.y * cellSize}
-      r={3}
+      r={3.2}
       fill="#000"
+      fillOpacity="0.9"
     />
   ));
 
@@ -79,13 +83,13 @@ const GoBoard: React.FC<GoBoardProps> = ({ grid, lastMove, onIntersectionClick, 
             <circle
               cx={cx + 1}
               cy={cy + 2}
-              r={cellSize / 2 - 1}
+              r={cellSize / 2 - 1.5}
               fill="rgba(0,0,0,0.3)"
             />
             <circle
               cx={cx}
               cy={cy}
-              r={cellSize / 2 - 1}
+              r={cellSize / 2 - 1.5}
               fill={`url(#${gradId})`}
               stroke={stone === StoneColor.WHITE ? '#ccc' : '#000'}
               strokeWidth={0.5}
@@ -98,6 +102,7 @@ const GoBoard: React.FC<GoBoardProps> = ({ grid, lastMove, onIntersectionClick, 
                 fill="transparent"
                 stroke={stone === StoneColor.BLACK ? 'white' : 'black'}
                 strokeWidth={2}
+                strokeOpacity="0.8"
               />
             )}
           </g>
@@ -124,21 +129,25 @@ const GoBoard: React.FC<GoBoardProps> = ({ grid, lastMove, onIntersectionClick, 
     }
   }
 
-  // Coordinates - Positioned within the border area
+  // Coordinates
   const coords = [];
   const coordLabels = 'ABCDEFGHJKLMNOPQRST';
   for (let i = 0; i < BOARD_SIZE; i++) {
-    coords.push(<text key={`ct-${i}`} x={padding + i * cellSize} y={padding - 8} textAnchor="middle" fontSize="10" fill="#111" className="font-sans font-bold select-none opacity-80">{coordLabels[i]}</text>);
-    coords.push(<text key={`cb-${i}`} x={padding + i * cellSize} y={boardPixelSize - padding + 15} textAnchor="middle" fontSize="10" fill="#111" className="font-sans font-bold select-none opacity-80">{coordLabels[i]}</text>);
-    coords.push(<text key={`cl-${i}`} x={padding - 10} y={padding + i * cellSize + 3.5} textAnchor="end" fontSize="10" fill="#111" className="font-sans font-bold select-none opacity-80">{BOARD_SIZE - i}</text>);
-    coords.push(<text key={`cr-${i}`} x={boardPixelSize - padding + 10} y={padding + i * cellSize + 3.5} textAnchor="start" fontSize="10" fill="#111" className="font-sans font-bold select-none opacity-80">{BOARD_SIZE - i}</text>);
+    // Tighter coordinate positions
+    coords.push(<text key={`ct-${i}`} x={padding + i * cellSize} y={padding - 7} textAnchor="middle" fontSize="9" fill="#111" className="font-sans font-bold select-none opacity-60 tracking-tighter">{coordLabels[i]}</text>);
+    coords.push(<text key={`cb-${i}`} x={padding + i * cellSize} y={boardPixelSize - padding + 13} textAnchor="middle" fontSize="9" fill="#111" className="font-sans font-bold select-none opacity-60 tracking-tighter">{coordLabels[i]}</text>);
+    coords.push(<text key={`cl-${i}`} x={padding - 8} y={padding + i * cellSize + 3.5} textAnchor="end" fontSize="9" fill="#111" className="font-sans font-bold select-none opacity-60 tracking-tighter">{BOARD_SIZE - i}</text>);
+    coords.push(<text key={`cr-${i}`} x={boardPixelSize - padding + 8} y={padding + i * cellSize + 3.5} textAnchor="start" fontSize="9" fill="#111" className="font-sans font-bold select-none opacity-60 tracking-tighter">{BOARD_SIZE - i}</text>);
   }
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-0">
-      <div className="relative aspect-square w-full h-full max-w-full max-h-full shadow-2xl bg-wood-300 rounded overflow-hidden flex items-center justify-center shrink-0">
-        <div className="absolute inset-0 pointer-events-none opacity-25" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/wood-pattern.png")' }}></div>
-        
+    <div className="w-full h-full flex items-center justify-center bg-transparent relative overflow-hidden group p-4">
+      {/* Reduced the board scale even further to 75% and minimized internal padding */}
+      <div className="relative aspect-square h-[75%] max-h-[75%] flex items-center justify-center shrink-0 shadow-[0_25px_60px_rgba(0,0,0,0.7)] rounded-[2px] overflow-hidden bg-wood-300 transition-all duration-300">
+        {/* Wooden texture local to the board */}
+        <div className="absolute inset-0 pointer-events-none opacity-25 mix-blend-multiply" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/wood-pattern.png")' }}></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/10 pointer-events-none"></div>
+
         <svg 
             viewBox={`0 0 ${boardPixelSize} ${boardPixelSize}`}
             className="w-full h-full block relative z-10 p-0"
