@@ -4,9 +4,9 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Shims the specific environment variable the app expects
+    // Provides the API key to the client-side code
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY),
-    // Provides a fallback for 'process' to prevent runtime errors in the browser
+    // Shim for libraries that expect process.env to exist
     'process.env': {}
   },
   server: {
