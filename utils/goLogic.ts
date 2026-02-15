@@ -1,5 +1,7 @@
-
 import { StoneColor, BoardState, Coordinate } from '../types';
+import * as influence from '@sabaki/influence';
+import boardmatcher from '@sabaki/boardmatcher';
+import library from '@sabaki/boardmatcher/library';
 
 export const BOARD_SIZE = 19;
 
@@ -16,8 +18,6 @@ export const getNeighbors = (x: number, y: number, size: number = BOARD_SIZE): C
   return neighbors;
 };
 
-// Returns true if the group has liberties.
-// Also returns the group of stones.
 export const checkLiberties = (
   grid: StoneColor[][],
   x: number,
@@ -61,19 +61,16 @@ export const playMove = (
     return { newState: currentState, valid: false, message: 'Point is occupied' };
   }
 
-  // Check Ko
   if (currentState.koPoint && currentState.koPoint.x === x && currentState.koPoint.y === y) {
     return { newState: currentState, valid: false, message: 'Ko rule violation' };
   }
 
-  // Clone grid
   const newGrid = currentState.grid.map((row) => [...row]);
   newGrid[y][x] = color;
 
   const opponent = color === StoneColor.BLACK ? StoneColor.WHITE : StoneColor.BLACK;
   let capturedStones: Coordinate[] = [];
 
-  // Check neighbors for captures
   const neighbors = getNeighbors(x, y);
   for (const n of neighbors) {
     if (newGrid[n.y][n.x] === opponent) {
@@ -84,12 +81,10 @@ export const playMove = (
     }
   }
 
-  // Remove captured stones
   capturedStones.forEach((s) => {
     newGrid[s.y][s.x] = StoneColor.EMPTY;
   });
 
-  // Check suicide
   if (capturedStones.length === 0) {
     const selfResult = checkLiberties(newGrid, x, y, color);
     if (!selfResult.hasLiberties) {
@@ -97,7 +92,6 @@ export const playMove = (
     }
   }
 
-  // Update captures
   const newCaptures = { ...currentState.captures };
   if (color === StoneColor.BLACK) {
     newCaptures.B += capturedStones.length;
@@ -105,7 +99,6 @@ export const playMove = (
     newCaptures.W += capturedStones.length;
   }
 
-  // Set Ko point
   let newKoPoint: Coordinate | null = null;
   if (capturedStones.length === 1) {
     const s = capturedStones[0];
@@ -150,9 +143,54 @@ export const boardToAscii = (grid: StoneColor[][]): string => {
 };
 
 export const toGtpCoordinate = (x: number, y: number): string => {
-  const letters = 'ABCDEFGHJKLMNOPQRST'; // I is skipped in Go
+  const letters = 'ABCDEFGHJKLMNOPQRST'; 
   if (x < 0 || x >= 19 || y < 0 || y >= 19) return 'pass';
   const col = letters[x];
   const row = 19 - y;
   return `${col}${row}`;
 };
+
+const toSabakiData = (grid: StoneColor[][]): number[][] => {
+    return grid.map(row => row.map(cell => 
+        cell === StoneColor.BLACK ? 1 : 
+        cell === StoneColor.WHITE ? -1 : 0
+    ));
+};
+
+export const calculateInfluence = (grid: StoneColor[][]): { blackArea: number, whiteArea: number } => {
+    const data = toSabakiData(grid);
+    const areaMap = influence.areaMap(data);
+    let blackArea = 0;
+    let whiteArea = 0;
+    areaMap.forEach(row => {
+        row.forEach(val => {
+            if (val === 1) blackArea++;
+            else if (val === -1) whiteArea++;
+        });
+    });
+    return { blackArea, whiteArea };
+}
+
+export const findShapes = (grid: StoneColor[][]): string[] => {
+    const data = toSabakiData(grid);
+    const size = grid.length;
+    const found: string[] = [];
+    const patterns = [...library.hane, ...library.cut, ...library.shapes];
+    let count = 0;
+    for(let y=0; y<size; y++) {
+        for(let x=0; x<size; x++) {
+            if(count > 20) break;
+            const vertex: [number, number] = [x, y];
+            for(const pattern of patterns) {
+                const matches = [...boardmatcher.matchShape(data, vertex, pattern)];
+                if(matches.length > 0) {
+                    if(pattern.name) {
+                        found.push(`${pattern.name} at ${toGtpCoordinate(x, y)}`);
+                        count++;
+                    }
+                }
+            }
+        }
+    }
+    return Array.from(new Set(found));
+}

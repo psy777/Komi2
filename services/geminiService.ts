@@ -4,8 +4,14 @@ import { BoardState, StoneColor } from "../types";
 import { boardToAscii } from "../utils/goLogic";
 import { fetchKataGoAnalysis } from "./katagoService";
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Safe initialization helper
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API_KEY is not defined. Please set it in your environment variables.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const analyzePosition = async (
   boardState: BoardState,
@@ -16,8 +22,8 @@ export const analyzePosition = async (
 ): Promise<string> => {
   const boardAscii = boardToAscii(boardState.grid);
   const turnStr = playerTurn === StoneColor.BLACK ? "Black" : "White";
+  const ai = getAiClient();
   
-  // 1. Fetch KataGo Analysis
   let kataGoContext = "";
   let engineMovesSent = JSON.stringify(gtpMoves);
 
@@ -85,7 +91,6 @@ export const analyzePosition = async (
 
     const aiText = response.text || "I couldn't generate an analysis.";
     
-    // APPEND DEBUG INFO FOR THE USER
     const debugBlock = `
 \n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
 **🛠️ DEBUG CONTEXT**
@@ -119,6 +124,7 @@ export const chatWithGemini = async (
 
 export const summarizeCommentary = async (question: string, answer: string): Promise<string> => {
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: [
