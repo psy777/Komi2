@@ -2,6 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
+// Global shim to prevent "process is not defined" errors in browser
+if (typeof (window as any).process === 'undefined') {
+  (window as any).process = { env: {} };
+}
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");

@@ -1,7 +1,4 @@
 import { StoneColor, BoardState, Coordinate } from '../types';
-import * as influence from '@sabaki/influence';
-import boardmatcher from '@sabaki/boardmatcher';
-import library from '@sabaki/boardmatcher/library';
 
 export const BOARD_SIZE = 19;
 
@@ -149,48 +146,3 @@ export const toGtpCoordinate = (x: number, y: number): string => {
   const row = 19 - y;
   return `${col}${row}`;
 };
-
-const toSabakiData = (grid: StoneColor[][]): number[][] => {
-    return grid.map(row => row.map(cell => 
-        cell === StoneColor.BLACK ? 1 : 
-        cell === StoneColor.WHITE ? -1 : 0
-    ));
-};
-
-export const calculateInfluence = (grid: StoneColor[][]): { blackArea: number, whiteArea: number } => {
-    const data = toSabakiData(grid);
-    const areaMap = influence.areaMap(data);
-    let blackArea = 0;
-    let whiteArea = 0;
-    areaMap.forEach(row => {
-        row.forEach(val => {
-            if (val === 1) blackArea++;
-            else if (val === -1) whiteArea++;
-        });
-    });
-    return { blackArea, whiteArea };
-}
-
-export const findShapes = (grid: StoneColor[][]): string[] => {
-    const data = toSabakiData(grid);
-    const size = grid.length;
-    const found: string[] = [];
-    const patterns = [...library.hane, ...library.cut, ...library.shapes];
-    let count = 0;
-    for(let y=0; y<size; y++) {
-        for(let x=0; x<size; x++) {
-            if(count > 20) break;
-            const vertex: [number, number] = [x, y];
-            for(const pattern of patterns) {
-                const matches = [...boardmatcher.matchShape(data, vertex, pattern)];
-                if(matches.length > 0) {
-                    if(pattern.name) {
-                        found.push(`${pattern.name} at ${toGtpCoordinate(x, y)}`);
-                        count++;
-                    }
-                }
-            }
-        }
-    }
-    return Array.from(new Set(found));
-}

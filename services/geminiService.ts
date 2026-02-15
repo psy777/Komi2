@@ -1,14 +1,13 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { BoardState, StoneColor } from "../types";
 import { boardToAscii } from "../utils/goLogic";
 import { fetchKataGoAnalysis } from "./katagoService";
 
-// Safe initialization helper
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
+  // Use a fallback to prevent immediate crash if env is missing
+  const apiKey = process.env.API_KEY || '';
   if (!apiKey) {
-    throw new Error("API_KEY is not defined. Please set it in your environment variables.");
+    console.warn("API_KEY is missing. AI features will be disabled.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -25,86 +24,45 @@ export const analyzePosition = async (
   const ai = getAiClient();
   
   let kataGoContext = "";
-  let engineMovesSent = JSON.stringify(gtpMoves);
-
   try {
       const kataGoData = await fetchKataGoAnalysis(gtpMoves, komi);
-      
       if (kataGoData && kataGoData.bot_move) {
           const botMove = kataGoData.bot_move;
           const bestTen = kataGoData.diagnostics?.best_ten || [];
-          
           kataGoContext = `
-          [SUPERHUMAN ENGINE DATA (KATAGO) - ABSOLUTE TRUTH]
-          The engine has analyzed the position. You MUST follow its recommendation.
-          
-          BEST MOVE: ${botMove}
-          - Win Probability: ${kataGoData.diagnostics?.winprob ? (kataGoData.diagnostics.winprob * 100).toFixed(1) + '%' : 'N/A'}
-          - Score Lead: ${kataGoData.diagnostics?.score ?? 'N/A'}
-          
-          Alternative Moves:
-          ${bestTen.slice(0, 4).map((m: any) => `- ${m.move} (Score: ${m.score}, Win: ${(m.winrate || m.winprob || 0) * 100}%)`).join('\n')}
-          `;
-      } else if (kataGoData && kataGoData.moveInfos) {
-          const topMoves = kataGoData.moveInfos.slice(0, 3);
-          kataGoContext = `
-          [SUPERHUMAN ENGINE DATA (KATAGO)]
-          Best Move: ${topMoves[0].move}
-          Win Rate: ${(topMoves[0].winrate * 100).toFixed(1)}%
-          `;
-      } else {
-          kataGoContext = "\n[WARNING: KataGo returned valid JSON but no move data found.]";
+[KATAGO ENGINE DATA]
+BEST MOVE: ${botMove}
+Win Prob: ${kataGoData.diagnostics?.winprob ? (kataGoData.diagnostics.winprob * 100).toFixed(1) + '%' : 'N/A'}
+Score Lead: ${kataGoData.diagnostics?.score ?? 'N/A'}
+Alternatives: ${bestTen.slice(0, 3).map((m: any) => m.move).join(', ')}
+`;
       }
-  } catch (e: any) {
-      console.error("Failed to inject KataGo context", e);
-      kataGoContext = `\n[Error fetching Engine Data: ${e.message}]`;
+  } catch (e) {
+      console.error("KataGo context failed", e);
   }
   
-  const systemPrompt = `
-    You are an expert Go analysis assistant. You use an ASCII board representation and external engine data to provide commentary.
-    
-    INSTRUCTIONS:
-    1. Report the "BEST MOVE" from the Engine Data.
-    2. Explain the tactical implications of the move based on the board state.
-    3. Be concise, educational, and helpful to a student of the game.
-
-    Current Turn: ${turnStr}
-    Komi: ${komi}
-    
-    ${kataGoContext}
-  `;
+  const systemInstruction = `You are a world-class Go (Baduk/Weiqi) teacher. 
+Analyze the board state and engine data provided. Be professional, insightful, and concise. 
+Current Turn: ${turnStr}, Komi: ${komi}. ${kataGoContext}`;
 
   const userPrompt = userQuestion 
-    ? `Student Question: "${userQuestion}"\n\nBoard:\n${boardAscii}`
-    : `What is the best move? Board:\n${boardAscii}`;
+    ? `Question: "${userQuestion}"\n\nBoard:\n${boardAscii}`
+    : `What is the best move in this position? Board:\n${boardAscii}`;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: [
-        { role: 'user', parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }
-      ],
+      contents: userPrompt,
       config: {
+        systemInstruction,
         temperature: 0.3,
       }
     });
 
-    const aiText = response.text || "I couldn't generate an analysis.";
-    
-    const debugBlock = `
-\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
-**🛠️ DEBUG CONTEXT**
-**Moves Sent:** \`${engineMovesSent}\`
-
-**Engine Data:**
-${kataGoContext.trim()}
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯`;
-
-    return aiText + debugBlock;
-
+    return response.text || "I was unable to analyze this position.";
   } catch (error) {
-    console.error("Gemini API Error:", error);
-    return "Sorry, error communicating with AI.\n\n" + kataGoContext;
+    console.error("Gemini Error:", error);
+    return "The AI analysis is currently unavailable. Please check your API key.";
   }
 };
 
@@ -114,10 +72,12 @@ export const chatWithGemini = async (
   komi: number,
   gtpMoves: string[] = []
 ): Promise<string> => {
+    // Map history to standard contents if needed, but analyzePosition takes specific params
+    const lastUserMsg = history.filter(h => h.role === 'user').pop()?.content;
     return analyzePosition(boardState, 
         history.length % 2 === 0 ? StoneColor.BLACK : StoneColor.WHITE, 
         komi, 
-        history[history.length-1].content, 
+        lastUserMsg, 
         gtpMoves
     );
 }
@@ -127,26 +87,14 @@ export const summarizeCommentary = async (question: string, answer: string): Pro
     const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: [
-        { 
-            role: 'user', 
-            parts: [{ text: `Summarize this Go advice into a tiny comment (MAX 8 WORDS). Plain text.
-            
-            Q: ${question}
-            A: ${answer}
-            
-            Summary:` }] 
-        }
-      ],
+      contents: `Summarize this Go advice in <8 words: Q: ${question} A: ${answer}`,
       config: {
+        systemInstruction: "You are a concise Go editor summary bot.",
         temperature: 0.5,
-        maxOutputTokens: 20, 
       }
     });
-
     return response.text?.trim() || "";
   } catch (error) {
-    console.error("Gemini Summary Error:", error);
     return "";
   }
 };
