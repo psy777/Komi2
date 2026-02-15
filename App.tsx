@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { FaFolderOpen, FaSave, FaChevronLeft, FaChevronRight, FaStepBackward, FaStepForward, FaCodeBranch, FaInfoCircle, FaUserCircle, FaBars, FaChevronUp, FaChevronDown, FaTimes } from 'react-icons/fa';
@@ -270,7 +269,7 @@ const App: React.FC = () => {
   const nextNodes = currentNode.childrenIds.map(id => gameTree.nodes[id]);
 
   return (
-    <div className="h-screen bg-slate-950 text-slate-100 font-sans flex flex-col overflow-hidden relative">
+    <div className="h-[100dvh] bg-slate-950 text-slate-100 font-sans flex flex-col overflow-hidden relative">
       
       {/* Menu Data Overlay (Top of Screen) */}
       {showStats && (
@@ -345,23 +344,21 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Layout */}
-      <main className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-950">
+      <main className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-950 relative">
         
-        {/* Left Panel: Board (Priority - maximized space) */}
-        <div className="flex-1 flex flex-col min-w-0 relative">
-            <div className="flex-1 overflow-hidden flex items-center justify-center p-2 sm:p-4">
-                 <GoBoard 
-                    grid={boardState.grid} 
-                    lastMove={boardState.lastMove}
-                    onIntersectionClick={handleIntersectionClick}
-                />
-            </div>
+        {/* Left Panel: Board (Maintained Square, Comfortably Centered) */}
+        <div className="flex-1 min-w-0 min-h-0 relative flex items-center justify-center overflow-hidden p-4 md:p-8">
+             <GoBoard 
+                grid={boardState.grid} 
+                lastMove={boardState.lastMove}
+                onIntersectionClick={handleIntersectionClick}
+            />
         </div>
 
         {/* Sidebar Docked Layout */}
-        <div className="w-full md:w-[400px] bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 flex flex-col shrink-0 z-20 h-auto md:h-full">
+        <div className="w-full md:w-[400px] bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 flex flex-col shrink-0 z-20 h-auto md:h-full overflow-hidden">
             
-            {/* Chat History Section (Expands UPWARD on mobile) */}
+            {/* Chat History Section */}
             <div className={`flex-1 overflow-hidden bg-slate-950/20 flex flex-col transition-all duration-300 ease-in-out ${chatExpanded ? 'h-[250px] md:h-full opacity-100' : 'h-0 opacity-0 md:opacity-100 md:h-full'}`}>
                  <GeminiChat 
                     currentNodeId={gameTree.currentId}
@@ -378,7 +375,7 @@ const App: React.FC = () => {
             </div>
 
             {/* Bottom Controls Hub */}
-            <div className="bg-slate-900 flex flex-col border-t border-slate-800 shadow-[0_-5px_15px_rgba(0,0,0,0.3)] z-30">
+            <div className="bg-slate-900 flex flex-col border-t border-slate-800 shadow-[0_-5px_15px_rgba(0,0,0,0.3)] z-30 shrink-0">
                 
                 {/* Mobile Expand Button (Above Chatbar) */}
                 <div 
@@ -388,7 +385,7 @@ const App: React.FC = () => {
                     {chatExpanded ? <FaChevronDown className="text-slate-600 text-[10px]" /> : <FaChevronUp className="text-slate-600 text-[10px]" />}
                 </div>
 
-                {/* Gemini Chat Input Area (Directly above nav controls, no bottom border) */}
+                {/* Gemini Chat Input Area */}
                 <div className="border-b-0">
                     <GeminiChat 
                         currentNodeId={gameTree.currentId}
@@ -404,7 +401,7 @@ const App: React.FC = () => {
                     />
                 </div>
 
-                {/* Navigation Controls (Absolute Bottom of UI) */}
+                {/* Navigation Controls */}
                 <div className="p-3 bg-slate-900 flex flex-col gap-2 shrink-0 border-t border-slate-800/50">
                     <div className="flex items-center justify-between gap-1 max-w-sm mx-auto w-full">
                         <button onClick={handleFirst} className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-all" title="Start"><FaStepBackward size={14}/></button>
