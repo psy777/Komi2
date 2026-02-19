@@ -12,7 +12,7 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
-    allowedHosts: ['komi2.onrender.com']
+    allowedHosts: ['komi2.onrender.com', 'komireview.com']
   },
   build: {
     outDir: 'dist',
