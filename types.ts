@@ -36,8 +36,11 @@ export interface GameTree {
   currentId: string;
 }
 
+import Board from '@sabaki/go-board';
+
 export interface BoardState {
-  grid: StoneColor[][];
+  board: Board;
+  grid: (0 | 1 | -1)[][]; // -1 for White, 1 for Black, 0 for Empty (Sabaki SignMap format)
   captures: {
     B: number;
     W: number;

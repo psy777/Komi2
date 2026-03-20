@@ -1,118 +1,141 @@
 import { GameTree, GameNode, StoneColor } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import pkg from '@sabaki/sgf';
 
-// A simplified SGF parser that handles the main line and basic properties.
-// Does not robustly handle complex nested variations for this demo, but builds a linear or simple tree.
+const { parse, stringify } = pkg;
 
 export const parseSGF = (sgfContent: string): GameTree => {
-  const rootId = uuidv4();
+  const rootNodes = parse(sgfContent);
+  if (!rootNodes || rootNodes.length === 0) {
+    throw new Error("Invalid SGF or empty SGF content");
+  }
+
   const nodes: Record<string, GameNode> = {};
-  
-  // Clean content
-  let content = sgfContent.replace(/\s+/g, ' ');
-  
-  // Very basic stack-based parser
-  let currentParentId: string | null = null;
-  let lastNodeId: string | null = null;
-  
-  // This is a naive parser for the MVP. Real SGF parsing is a grammar.
-  // We extract nodes denoted by ;
-  
-  const tokens = content.split(';');
-  
-  // The first token is usually empty or start of file '('
-  
-  let isRoot = true;
+  const rootNodeId = uuidv4();
 
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i].trim();
-    if (!token || token === '(' || token === ')') continue;
-
-    const nodeId = isRoot ? rootId : uuidv4();
+  // Recursively process sabaki nodes
+  const processNode = (sabakiNode: any, parentId: string | null, forceId?: string): string => {
+    const nodeId = forceId || uuidv4();
     const node: GameNode = {
       id: nodeId,
-      parentId: currentParentId,
+      parentId,
       childrenIds: [],
       properties: {},
       chatHistory: [],
     };
 
-    // Extract properties like B[pd], W[dp], C[comment]
-    const propRegex = /([A-Z]+)\[([^\]]*)\]/g;
-    let match;
-    while ((match = propRegex.exec(token)) !== null) {
-      const key = match[1];
-      const val = match[2];
-      
-      node.properties[key] = val;
+    // Process properties mapping sabaki's arrays to our string formats
+    if (sabakiNode.data) {
+      for (const [key, values] of Object.entries<string[]>(sabakiNode.data)) {
+        if (!values || values.length === 0) continue;
 
-      if (key === 'B' || key === 'W') {
-        if (val === '') {
-            // Pass
-            node.move = {
-                color: key === 'B' ? StoneColor.BLACK : StoneColor.WHITE,
-                x: -1,
-                y: -1
-            }
+        if (values.length === 1) {
+          node.properties[key] = values[0];
         } else {
+          node.properties[key] = values.join(',');
+        }
+
+        if (key === 'B' || key === 'W') {
+          const val = values[0] || '';
+          if (val === '') {
+            node.move = {
+              color: key === 'B' ? StoneColor.BLACK : StoneColor.WHITE,
+              x: -1,
+              y: -1
+            };
+          } else {
             const x = val.charCodeAt(0) - 97;
             const y = val.charCodeAt(1) - 97;
             node.move = {
-            color: key === 'B' ? StoneColor.BLACK : StoneColor.WHITE,
-            x,
-            y,
+              color: key === 'B' ? StoneColor.BLACK : StoneColor.WHITE,
+              x,
+              y,
             };
+          }
         }
-      }
-      if (key === 'C') {
-        node.comment = val;
+        if (key === 'C') {
+          node.comment = values.join('\n');
+        }
       }
     }
 
     nodes[nodeId] = node;
 
-    if (currentParentId && nodes[currentParentId]) {
-      nodes[currentParentId].childrenIds.push(nodeId);
+    if (sabakiNode.children && sabakiNode.children.length > 0) {
+      for (const child of sabakiNode.children) {
+        const childId = processNode(child, nodeId);
+        nodes[nodeId].childrenIds.push(childId);
+      }
     }
 
-    currentParentId = nodeId;
-    lastNodeId = nodeId;
-    isRoot = false;
-  }
+    return nodeId;
+  };
 
-  // Correct the root parent
-  nodes[rootId].parentId = null;
+  // We start the root process
+  processNode(rootNodes[0], null, rootNodeId);
 
   return {
     nodes,
-    rootId,
-    currentId: rootId,
+    rootId: rootNodeId,
+    currentId: rootNodeId,
   };
 };
 
 export const generateSGF = (tree: GameTree): string => {
-  // Linear generation for MVP export
-  let sgf = '(;GM[1]FF[4]SZ[19]';
-  
-  let currentId: string | null = tree.nodes[tree.rootId].childrenIds[0] || null;
-  // If root has properties, add them
-  const root = tree.nodes[tree.rootId];
-  if(root.comment) sgf += `C[${root.comment}]`;
+  // Recursively build sabaki SGF format
+  const buildSabakiNode = (nodeId: string): any => {
+    const node = tree.nodes[nodeId];
+    if (!node) return null;
 
-  while (currentId) {
-    const node = tree.nodes[currentId];
-    sgf += ';';
-    if (node.move) {
+    const data: Record<string, string[]> = {};
+
+    if (nodeId === tree.rootId) {
+      // Root usually needs these if missing
+      if (!node.properties['GM']) data['GM'] = ['1'];
+      if (!node.properties['FF']) data['FF'] = ['4'];
+      if (!node.properties['SZ']) data['SZ'] = ['19'];
+    }
+
+    if (node.move && nodeId !== tree.rootId) {
+      const colorKey = node.move.color === StoneColor.BLACK ? 'B' : 'W';
+      if (node.move.x === -1 && node.move.y === -1) {
+        data[colorKey] = ['']; // Pass
+      } else {
         const charX = String.fromCharCode(node.move.x + 97);
         const charY = String.fromCharCode(node.move.y + 97);
-        sgf += `${node.move.color}[${charX}${charY}]`;
+        data[colorKey] = [`${charX}${charY}`];
+      }
     }
-    if (node.comment) {
-        sgf += `C[${node.comment}]`;
+
+    for (const [key, val] of Object.entries(node.properties)) {
+      if (['B', 'W', 'SZ', 'GM', 'FF'].includes(key)) {
+        // Keep existing properties if they existed (except moves which are handled)
+        if (key === 'B' || key === 'W') continue;
+      }
+      const strVal = val as string;
+      if (strVal.includes(',')) {
+        data[key] = strVal.split(',');
+      } else {
+        data[key] = [strVal];
+      }
     }
-    currentId = node.childrenIds.length > 0 ? node.childrenIds[0] : null;
-  }
-  
-  sgf += ')';
-  return sgf;
+
+    if (node.comment && !data['C']) {
+      data['C'] = [node.comment];
+    }
+
+    const children = node.childrenIds
+      .map(childId => buildSabakiNode(childId))
+      .filter(child => child !== null);
+
+    return {
+      data,
+      children
+    };
+  };
+
+  const rootSabakiNode = buildSabakiNode(tree.rootId);
+  if (!rootSabakiNode) return "(;)";
+
+  return stringify([rootSabakiNode]);
 };
